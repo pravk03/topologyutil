@@ -4,6 +4,8 @@
 package cpuinfo
 
 import (
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,11 +18,17 @@ type CPUInfo struct {
 	// CpuId is the enumerated CPU ID
 	CpuId int `json:"cpuId"`
 
+	// CoreId is the logical core ID, unique within each SocketId
+	CoreId int `json:"coreId"`
+
 	// SocketId is the physical socket ID
 	SocketId int `json:"socketId"`
 
-	// CoreId is the logical core ID, unique within each SocketId
-	CoreId int `json:"coreId"`
+	// Numa Node is the NUMA node ID, unique within each SocketId
+	NumaNode int `json:"numaNode"`
+
+	// NUMA Node Affinity Mask
+	NumaNodeAffinityMask string `json:"numaNodeAffinityMask"`
 }
 
 func GetCPUInfos(options ...CPUInfoOption) ([]CPUInfo, error) {
@@ -70,9 +78,11 @@ func WithoutECores() CPUInfoOption {
 
 func (opts cpuInfoOptions) parseCPUInfo(lines ...string) *CPUInfo {
 	cpuInfo := &CPUInfo{
-		CpuId:    -1,
-		SocketId: -1,
-		CoreId:   -1,
+		CpuId:                -1,
+		SocketId:             -1,
+		CoreId:               -1,
+		NumaNode:             -1,
+		NumaNodeAffinityMask: "",
 	}
 
 	if len(lines) == 0 {
@@ -103,10 +113,44 @@ func (opts cpuInfoOptions) parseCPUInfo(lines ...string) *CPUInfo {
 		return nil
 	}
 
+	if err := populateNumaInfo(cpuInfo); err != nil {
+		log.Printf("Warning: failed to populate NUMA info for CPU %d: %v", cpuInfo.CpuId, err)
+	}
+
 	if opts.avoidCPU(cpuInfo.CpuId) {
 		return nil
 	}
 	return cpuInfo
+}
+
+func populateNumaInfo(cpuInfo *CPUInfo) error {
+	nodePath := HostSys(fmt.Sprintf("devices/system/cpu/cpu%d", cpuInfo.CpuId))
+	files, err := os.ReadDir(nodePath)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), "node") {
+			nodeId, err := strconv.Atoi(strings.TrimPrefix(file.Name(), "node"))
+			if err != nil {
+				continue
+			}
+			cpuInfo.NumaNode = nodeId
+			mask, err := ReadLines(HostSys(fmt.Sprintf("devices/system/node/node%d/cpumap", nodeId)))
+			if err == nil {
+				cpuInfo.NumaNodeAffinityMask = formatAffinityMask(mask[0])
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no numa node found for cpu %d", cpuInfo.CpuId)
+}
+
+func formatAffinityMask(mask string) string {
+	newMask := strings.ReplaceAll(mask, ",", "")
+	newMask = strings.TrimSpace(newMask)
+	return "0x" + newMask
 }
 
 func parseInt(str string) int {
