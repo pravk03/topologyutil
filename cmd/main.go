@@ -10,8 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitlab.com/SchedMD/slinky-dev/cpuutil/pkg/cpuinfo"
-	"gitlab.com/SchedMD/slinky-dev/cpuutil/pkg/cpumap"
+	"github.com/pravk03/topologyutil/pkg/cpuinfo"
+	"github.com/pravk03/topologyutil/pkg/cpumap"
+	"github.com/pravk03/topologyutil/pkg/pcieinfo"
 )
 
 var noECore bool
@@ -55,6 +56,19 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 		println("===== CPU Map =====")
+		println(string(data))
+		println("")
+
+		println("===== PCIE Info  =====")
+		pcieinfo, err := pcieinfo.NewPCIEInfo()
+		if err != nil {
+			return err
+		}
+		allDevices := pcieinfo.GetAllDevices()
+		data, err = json.MarshalIndent(allDevices, "", "  ")
+		if err != nil {
+			return err
+		}
 		println(string(data))
 		println("")
 

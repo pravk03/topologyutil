@@ -11,8 +11,8 @@ import (
 	"github.com/kelindar/bitmap"
 	"k8s.io/utils/cpuset"
 
-	"gitlab.com/SchedMD/slinky-dev/cpuutil/pkg/bitmaputil"
-	"gitlab.com/SchedMD/slinky-dev/cpuutil/pkg/cpuinfo"
+	"github.com/pravk03/topologyutil/pkg/bitmaputil"
+	"github.com/pravk03/topologyutil/pkg/cpuinfo"
 )
 
 type CPUMap struct {
